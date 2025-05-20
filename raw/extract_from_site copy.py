@@ -6,7 +6,6 @@ from json import load
 from selenium import webdriver
 from time import sleep
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import TimeoutException
@@ -16,7 +15,9 @@ import csv
 from dotenv import load_dotenv
 import os
 import pandas as pd
-from random import randint
+import random
+from selenium.webdriver.common.keys import Keys
+
 def extract_from_site():
     load_dotenv()
     # credentials
@@ -82,39 +83,26 @@ def extract_from_site():
         print("Error getting total jobs:", e)
         driver.quit()
 
-    # Store url
-    url_jobs = []
-
     # Scroll to load all jobs
     def scroll_to_load_all_jobs():
-        retry = 0
-        last_height = driver.execute_script("return document.body.scrollHeight")
+        old_height = driver.execute_script("return document.body.scrollHeight;")
         while True:
-            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-            sleep(6)
-            new_height = driver.execute_script("return document.body.scrollHeight")
-            if new_height == last_height:
-                retry = 1
-                while retry < 4:
-                    print(f"Retry {retry}/3")
-                    driver.find_element(By.TAG_NAME, "body").send_keys(Keys.HOME)
-                    sleep(randint(40, 50))
-                    driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                    sleep(4)
-                    new_height = driver.execute_script("return document.body.scrollHeight")
-                    if new_height == last_height:
-                        retry += 1
-                    else:
-                        last_height = new_height
-                        break
-                else:
-                    break
-            last_height = new_height
+            driver.execute_script('window.scrollTo(0, document.body.scrollHeight);')
+            # sleep randomly
+            sleep(random.randint(5, 25))
+            new_height = driver.execute_script("return document.body.scrollHeight;")
+            if new_height == old_height:
+                break
+            old_height = new_height
 
     scroll_to_load_all_jobs()
 
+    # Store data
+    url_jobs = []
+    jobs_data = []
+
     # Get list of job URLs
-    for i in range(1, total + 2):
+    for i in range(1, total + 1):
         try:
             urls_path = f'//*[@id="frontend-v4"]/main/div[2]/div/div/div[1]/section/ul/li[{i}]/a/div/div/div[2]/h3/a' if i <= 11 else f'//*[@id="frontend-v4"]/main/div[2]/div/div/div[1]/section/ul/div/ul/li[{i}]/a/div/div/div[2]/h3/a'
             element = driver.find_element(By.XPATH, urls_path)
@@ -124,8 +112,6 @@ def extract_from_site():
             print(f"Error getting URL for job {i}")
             continue
 
-    # Store data
-    jobs_data = []
     # Get data from each job
     for url in url_jobs:
         driver.get(url)
@@ -176,6 +162,6 @@ def extract_from_site():
     jobs_df = pd.DataFrame(jobs_data)
     # Write data to dataframe
     data = pd.DataFrame(columns=["time", "job_type", "company_name", "salary", "location", "time_remain", "url"])
-    data = pd.concat([data, jobs_df], ignore_index=False)
+    data = pd.concat([data, jobs_df], ignore_index=True)
     
     return data
